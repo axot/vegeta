@@ -252,6 +252,10 @@ func (a *Attacker) hit(tr Targeter, tm time.Time) *Result {
 		return &res
 	}
 
+	if tgt.RequestCb != nil {
+		tgt.RequestCb()
+	}
+
 	req, err := tgt.Request()
 	if err != nil {
 		return &res
@@ -275,6 +279,10 @@ func (a *Attacker) hit(tr Targeter, tm time.Time) *Result {
 
 	if res.Code = uint16(r.StatusCode); res.Code < 200 || res.Code >= 400 {
 		res.Error = r.Status
+	}
+
+	if tgt.ResponseCb != nil {
+		tgt.ResponseCb(r.Status, r.Header, r.Body)
 	}
 
 	return &res

@@ -17,10 +17,12 @@ import (
 
 // Target is an HTTP request blueprint.
 type Target struct {
-	Method string
-	URL    string
-	Body   []byte
-	Header http.Header
+	Method     string
+	URL        string
+	Body       []byte
+	Header     http.Header
+	RequestCb  RequestCb
+	ResponseCb ResponseCb
 }
 
 // Request creates an *http.Request out of Target and returns it along with an
@@ -50,6 +52,12 @@ var (
 // A Targeter decodes a Target or returns an error in case of failure.
 // Implementations must be safe for concurrent use.
 type Targeter func(*Target) error
+
+// ResponseCb will be called after receive response
+type ResponseCb func(status string, header http.Header, body io.ReadCloser) error
+
+// RequestCb will be called before sending request
+type RequestCb func() error
 
 // NewStaticTargeter returns a Targeter which round-robins over the passed
 // Targets.
@@ -106,6 +114,16 @@ func NewLazyTargeter(src io.Reader, body []byte, hdr http.Header) Targeter {
 			return ErrNilTarget
 		}
 
+		tgt.RequestCb = func() error {
+			// fmt.Printf("Request cb, url: %s\n", tgt.URL)
+			return nil
+		}
+
+		tgt.ResponseCb = func(status string, header http.Header, body io.ReadCloser) error {
+			// fmt.Printf("Response cb, url: %s, body: %+v\n", tgt.URL, body)
+			return nil
+		}
+
 		var line string
 		for {
 			if !sc.Scan() {
@@ -139,6 +157,7 @@ func NewLazyTargeter(src io.Reader, body []byte, hdr http.Header) Targeter {
 		if line == "" || startsWithHTTPMethod(line) {
 			return nil
 		}
+
 		for sc.Scan() {
 			if line = strings.TrimSpace(sc.Text()); line == "" {
 				break
