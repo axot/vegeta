@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/http2"
@@ -182,11 +183,13 @@ func H2C(enabled bool) func(*Attacker) {
 // as they arrive.
 func (a *Attacker) Attack(tr Targeter, rate uint64, du time.Duration) <-chan *Result {
 	var workers sync.WaitGroup
+	workerId := int64(-1)
 	results := make(chan *Result)
 	ticks := make(chan time.Time)
 	for i := uint64(0); i < a.workers; i++ {
 		workers.Add(1)
-		go a.attack(tr, &workers, ticks, results)
+		atomic.AddInt64(&workerId, 1)
+		go a.attack(workerId, tr, &workers, ticks, results)
 	}
 
 	go func() {
@@ -208,7 +211,8 @@ func (a *Attacker) Attack(tr Targeter, rate uint64, du time.Duration) <-chan *Re
 				return
 			default: // all workers are blocked. start one more and try again
 				workers.Add(1)
-				go a.attack(tr, &workers, ticks, results)
+				atomic.AddInt64(&workerId, 1)
+				go a.attack(workerId, tr, &workers, ticks, results)
 			}
 		}
 	}()
@@ -226,14 +230,14 @@ func (a *Attacker) Stop() {
 	}
 }
 
-func (a *Attacker) attack(tr Targeter, workers *sync.WaitGroup, ticks <-chan time.Time, results chan<- *Result) {
+func (a *Attacker) attack(id int64, tr Targeter, workers *sync.WaitGroup, ticks <-chan time.Time, results chan<- *Result) {
 	defer workers.Done()
 	for tm := range ticks {
-		results <- a.hit(tr, tm)
+		results <- a.hit(id, tr, tm)
 	}
 }
 
-func (a *Attacker) hit(tr Targeter, tm time.Time) *Result {
+func (a *Attacker) hit(id int64, tr Targeter, tm time.Time) *Result {
 	var (
 		res = Result{Timestamp: tm}
 		tgt Target
@@ -247,7 +251,9 @@ func (a *Attacker) hit(tr Targeter, tm time.Time) *Result {
 		}
 	}()
 
-	if err = tr(&tgt); err != nil {
+	res.WorkerId = id
+
+	if err = tr(&tgt, id); err != nil {
 		a.Stop()
 		return &res
 	}

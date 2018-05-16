@@ -12,7 +12,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"sync/atomic"
 )
 
 // Target is an HTTP request blueprint.
@@ -51,7 +50,7 @@ var (
 
 // A Targeter decodes a Target or returns an error in case of failure.
 // Implementations must be safe for concurrent use.
-type Targeter func(*Target) error
+type Targeter func(tgt *Target, id ...int64) error
 
 // ResponseCb will be called after receive response
 type ResponseCb func(status string, header http.Header, body io.ReadCloser) error
@@ -62,12 +61,23 @@ type RequestCb func() error
 // NewStaticTargeter returns a Targeter which round-robins over the passed
 // Targets.
 func NewStaticTargeter(tgts ...Target) Targeter {
-	i := int64(-1)
-	return func(tgt *Target) error {
-		if tgt == nil {
+	var allTgts map[int64][]Target = map[int64][]Target{}
+	var allI map[int64]int64 = map[int64]int64{}
+
+	return func(tgt *Target, ids ...int64) error {
+		if tgt == nil || ids == nil || ids[0] < 0 {
 			return ErrNilTarget
 		}
-		*tgt = tgts[atomic.AddInt64(&i, 1)%int64(len(tgts))]
+
+		id := ids[0]
+		if _, ok := allTgts[id]; !ok {
+			allTgts[id] = make([]Target, len(tgts))
+			copy(allTgts[id], tgts)
+
+			allI[id] = -1
+		}
+		allI[id]++
+		*tgt = allTgts[id][allI[id]%int64(len(allTgts[id]))]
 		return nil
 	}
 }
@@ -106,7 +116,7 @@ func NewEagerTargeter(src io.Reader, body []byte, header http.Header) (Targeter,
 func NewLazyTargeter(src io.Reader, body []byte, hdr http.Header) Targeter {
 	var mu sync.Mutex
 	sc := peekingScanner{src: bufio.NewScanner(src)}
-	return func(tgt *Target) (err error) {
+	return func(tgt *Target, ids ...int64) (err error) {
 		mu.Lock()
 		defer mu.Unlock()
 

@@ -22,6 +22,7 @@ type Result struct {
 	BytesOut  uint64        `json:"bytes_out"`
 	BytesIn   uint64        `json:"bytes_in"`
 	Error     string        `json:"error"`
+	WorkerId  int64         `json:"worker_id"`
 }
 
 // End returns the time at which a Result ended.
