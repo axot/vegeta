@@ -56,7 +56,7 @@ type Targeter func(tgt *Target, id ...int64) error
 type SetupCb func(id int64) error
 
 // ResponseCb will be called after receive response
-type ResponseCb func(id int64, status string, header http.Header, body io.ReadCloser) error
+type ResponseCb func(id int64, status string, header http.Header, body []byte) error
 
 // RequestCb will be called before sending request
 type RequestCb func(id int64) error
@@ -64,8 +64,8 @@ type RequestCb func(id int64) error
 // NewStaticTargeter returns a Targeter which round-robins over the passed
 // Targets.
 func NewStaticTargeter(tgts ...Target) Targeter {
-	var allTgts map[int64][]Target = map[int64][]Target{}
-	var allI map[int64]int64 = map[int64]int64{}
+	var allTgts = map[int64][]Target{}
+	var allI = map[int64]int64{}
 
 	return func(tgt *Target, ids ...int64) error {
 		if tgt == nil || ids == nil || ids[0] < 0 {
@@ -131,7 +131,7 @@ func NewLazyTargeter(src io.Reader, body []byte, hdr http.Header) Targeter {
 			return nil
 		}
 
-		tgt.ResponseCb = func(id int64, status string, header http.Header, body io.ReadCloser) error {
+		tgt.ResponseCb = func(id int64, status string, header http.Header, body []byte) error {
 			// fmt.Printf("Response cb, url: %s, body: %+v\n", tgt.URL, body)
 			return nil
 		}
