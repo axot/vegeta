@@ -52,11 +52,14 @@ var (
 // Implementations must be safe for concurrent use.
 type Targeter func(tgt *Target, id ...int64) error
 
+// SetupCb will called
+type SetupCb func(id int64) error
+
 // ResponseCb will be called after receive response
-type ResponseCb func(status string, header http.Header, body io.ReadCloser) error
+type ResponseCb func(id int64, status string, header http.Header, body io.ReadCloser) error
 
 // RequestCb will be called before sending request
-type RequestCb func() error
+type RequestCb func(id int64) error
 
 // NewStaticTargeter returns a Targeter which round-robins over the passed
 // Targets.
@@ -73,7 +76,6 @@ func NewStaticTargeter(tgts ...Target) Targeter {
 		if _, ok := allTgts[id]; !ok {
 			allTgts[id] = make([]Target, len(tgts))
 			copy(allTgts[id], tgts)
-
 			allI[id] = -1
 		}
 		allI[id]++
@@ -124,12 +126,12 @@ func NewLazyTargeter(src io.Reader, body []byte, hdr http.Header) Targeter {
 			return ErrNilTarget
 		}
 
-		tgt.RequestCb = func() error {
+		tgt.RequestCb = func(id int64) error {
 			// fmt.Printf("Request cb, url: %s\n", tgt.URL)
 			return nil
 		}
 
-		tgt.ResponseCb = func(status string, header http.Header, body io.ReadCloser) error {
+		tgt.ResponseCb = func(id int64, status string, header http.Header, body io.ReadCloser) error {
 			// fmt.Printf("Response cb, url: %s, body: %+v\n", tgt.URL, body)
 			return nil
 		}

@@ -259,7 +259,7 @@ func (a *Attacker) hit(id int64, tr Targeter, tm time.Time) *Result {
 	}
 
 	if tgt.RequestCb != nil {
-		tgt.RequestCb()
+		tgt.RequestCb(id)
 	}
 
 	req, err := tgt.Request()
@@ -288,7 +288,7 @@ func (a *Attacker) hit(id int64, tr Targeter, tm time.Time) *Result {
 	}
 
 	if tgt.ResponseCb != nil {
-		tgt.ResponseCb(r.Status, r.Header, r.Body)
+		tgt.ResponseCb(id, r.Status, r.Header, r.Body)
 	}
 
 	return &res
